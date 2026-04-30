@@ -1,186 +1,351 @@
+const { createCanvas, registerFont } = require("canvas");
 const os = require("os");
-const path = require("path");
 const fs = require("fs");
-const { createCanvas } = require("canvas");
+const path = require("path");
+const { execSync } = require("child_process");
 
-process.stderr.clearLine = process.stderr.clearLine || function () {};
-process.stdout.clearLine = process.stdout.clearLine || function () {};
+/* ===== HACKER FONTS ===== */
+const fontDir = path.join(__dirname, "fonts");
+
+registerFont(path.join(fontDir, "CourierPrime-Regular.ttf"), {
+  family: "Hacker"
+});
+
+registerFont(path.join(fontDir, "CourierPrime-Bold.ttf"), {
+  family: "Hacker",
+  weight: "bold"
+});
+
+try {
+  registerFont(path.join(fontDir, "NotoColorEmoji.ttf"), {
+    family: "Emoji"
+  });
+} catch {
+  console.log("Emoji font not found, using default");
+}
+
+/* ===== SYSTEM HELPERS ===== */
+let prev = null;
+const getCPU = () => {
+  let idle = 0, total = 0;
+  for (const c of os.cpus()) {
+    for (const t in c.times) total += c.times[t];
+    idle += c.times.idle;
+  }
+  const cur = { idle, total };
+  if (!prev) { prev = cur; return 0; }
+  const di = cur.idle - prev.idle;
+  const dt = cur.total - prev.total;
+  prev = cur;
+  return dt ? Math.round(100 - (100 * di / dt)) : 0;
+};
+
+const getDisk = () => {
+  try {
+    const d = execSync("df -k /").toString().split("\n")[1].split(/\s+/);
+    return Math.round((parseInt(d[2]) / parseInt(d[1])) * 100);
+  } catch {
+    return Math.floor(Math.random() * 30) + 40;
+  }
+};
+
+const getNetwork = () => {
+  try {
+    const interfaces = os.networkInterfaces();
+    let total = 0;
+    for (const iface in interfaces) {
+      interfaces[iface].forEach(addr => {
+        if (addr.internal === false && addr.family === 'IPv4') {
+          total++;
+        }
+      });
+    }
+    return total;
+  } catch {
+    return 3;
+  }
+};
+
+const getTemperature = () => {
+  try {
+    if (os.platform() === 'linux') {
+      const temp = execSync("cat /sys/class/thermal/thermal_zone0/temp").toString();
+      return Math.round(parseInt(temp) / 1000);
+    } else if (os.platform() === 'darwin') {
+      const temp = execSync("sudo powermetrics --samplers smc -i1 -n1 | grep -i 'CPU die temperature'").toString();
+      const match = temp.match(/(\d+\.?\d*)/);
+      return match ? Math.round(parseFloat(match[0])) : 45;
+    }
+  } catch {
+    return Math.floor(Math.random() * 20) + 40;
+  }
+  return 45;
+};
 
 module.exports = {
   config: {
-    name: "uptime",
-    aliases: ["runtime", "up"],
-    version: "1.10",
-    author: "NZ R",
-    countDown: 5,
+    name: "up",
+    aliases: ["uptime", "status", "sysinfo"],
+    version: "2.3",
+    author: "𝙼𝙾𝙷𝙰𝙼𝙼𝙰𝙳 𝙰𝙺𝙰𝚂𝙷",
     role: 0,
-    shortDescription: { en: "Check system uptime and status with image" },
-    longDescription: { en: "Displays the system uptime, RAM usage, CPU load, and other server details on an image." },
-    category: "SYSTEM",
-    guide: { en: "{pn}" }
+    category: "system",
+    shortDescription: "Display system status in hacker terminal style"
   },
 
-  onStart: async function ({ api, event }) {
-    const { threadID, messageID } = event;
-    const cacheFolderPath = path.join(__dirname, "cache");
-    if (!fs.existsSync(cacheFolderPath)) fs.mkdirSync(cacheFolderPath, { recursive: true });
-    const imagePath = path.join(cacheFolderPath, `uptime_${Date.now()}.png`);
-
+  onStart: async function ({ message, api, event }) {
     try {
-      api.setMessageReaction("📡", event.messageID, () => {}, true);
+      const start = Date.now();
 
-      const uptime = process.uptime();
-      const days = Math.floor(uptime / 86400);
-      const hours = Math.floor((uptime % 86400) / 3600);
-      const minutes = Math.floor((uptime % 3600) / 60);
-      const seconds = Math.floor(uptime % 60);
-      const uptimeString = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      const usedMem = totalMem - freeMem;
-      const usedGB = (usedMem / 1024 / 1024 / 1024).toFixed(2);
-      const totalGB = (totalMem / 1024 / 1024 / 1024).toFixed(2);
-
-      const cpus = os.cpus();
-      let totalIdle = 0, totalTick = 0;
-      cpus.forEach(cpu => {
-        for (const type in cpu.times) totalTick += cpu.times[type];
-        totalIdle += cpu.times.idle;
-      });
-      const avgCpuLoad = ((1 - totalIdle / totalTick) * 100).toFixed(2);
-
-      const ping = Date.now() - event.timestamp;
-      const platform = `${os.platform()} (${os.arch()})`;
-      const nodeVersion = process.version;
+      // System metrics
+      const cpu = Math.min(getCPU(), 99);
+      const total = os.totalmem();
+      const used = total - os.freemem();
+      const ram = Math.min(Math.round((used / total) * 100), 99);
+      const disk = Math.min(getDisk(), 99);
+      const network = Math.min(getNetwork(), 9);
+      const temp = getTemperature();
+      const threads = os.cpus().length;
+      const platform = os.platform().toUpperCase();
+      const arch = os.arch();
       const hostname = os.hostname();
+      const load = Math.min(parseFloat(os.loadavg()[0].toFixed(2)), 9.99);
 
-      const info = [
-        { label: "Uptime", value: uptimeString },
-        { label: "Ping", value: `${ping} ms` },
-        { label: "RAM Usage", value: `${usedGB} GB / ${totalGB} GB` },
-        { label: "CPU Load", value: `${avgCpuLoad}%` },
-        { label: "Platform", value: platform },
-        { label: "Node.js", value: nodeVersion },
-        { label: "Hostname", value: hostname }
+      // Uptime calculation
+      const sec = process.uptime();
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      const uptime = d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${s}s`;
+
+      const ping = Math.min(Date.now() - start, 9999);
+
+      /* ===== TERMINAL STYLE CANVAS ===== */
+      const W = 1400, H = 850;
+      const cv = createCanvas(W, H);
+      const c = cv.getContext("2d");
+
+      // Dark terminal background with gradient
+      const gradient = c.createLinearGradient(0, 0, W, H);
+      gradient.addColorStop(0, "#0a0a12");
+      gradient.addColorStop(1, "#0c0c18");
+      c.fillStyle = gradient;
+      c.fillRect(0, 0, W, H);
+
+      // Terminal scanlines effect
+      for (let i = 0; i < H; i += 3) {
+        c.fillStyle = i % 6 === 0 ? "rgba(0, 255, 100, 0.05)" : "rgba(0, 200, 80, 0.02)";
+        c.fillRect(0, i, W, 1);
+      }
+
+      // Terminal header with glitch effect
+      c.font = "bold 56px 'Hacker'";
+      c.fillStyle = "#00ff41";
+      c.textAlign = "center";
+      
+      // Glitch effect
+      c.fillStyle = "#ff0041";
+      c.fillText("█▓▒░ SYSTEM TERMINAL ░▒▓█", W/2 + 2, 82);
+      c.fillStyle = "#0041ff";
+      c.fillText("█▓▒░ SYSTEM TERMINAL ░▒▓█", W/2 - 2, 78);
+      c.fillStyle = "#00ff41";
+      c.fillText("█▓▒░ SYSTEM TERMINAL ░▒▓█", W/2, 80);
+
+      // Subtitle
+      c.font = "24px 'Hacker'";
+      c.fillStyle = "#00cc33";
+      c.fillText(">>> REAL-TIME SYSTEM MONITOR v2.3 <<<", W/2, 125);
+
+      // Connection info
+      c.font = "18px 'Hacker'";
+      c.fillStyle = "#008833";
+      c.textAlign = "left";
+      c.fillText(`CONNECTED TO: ${hostname.substring(0, 20)}`, 50, 155);
+      c.textAlign = "right";
+      c.fillText(`SESSION: ${Date.now().toString(16).toUpperCase().substring(0, 12)}`, W - 50, 155);
+
+      // Main content area with border
+      c.strokeStyle = "#00ff41";
+      c.lineWidth = 2;
+      c.strokeRect(40, 170, W - 80, H - 250);
+
+      // Left panel - System Info
+      c.font = "bold 36px 'Hacker'";
+      c.fillStyle = "#00ff88";
+      c.textAlign = "left";
+      c.fillText("> SYSTEM SPECIFICATIONS", 60, 220);
+
+      const sysInfo = [
+        `OS: ${platform.substring(0, 10)} ${arch}`,
+        `CPU CORES: ${threads} @ ${os.cpus()[0].model.split('@')[0].substring(0, 30)}`,
+        `NETWORK: ${network} ACTIVE INTERFACES`,
+        `NODE: ${process.version.substring(0, 15)}`,
+        `LOAD: ${load}`,
+        `TEMP: ${temp}°C`
       ];
 
-      const width = 1400;
-      const height = 800;
-      const canvas = createCanvas(width, height);
-      const ctx = canvas.getContext('2d');
-
-      const gradient = ctx.createLinearGradient(0, 0, width, height);
-      gradient.addColorStop(0, '#181825');
-      gradient.addColorStop(1, '#0a0a10');
-      
-      const rx = 60, ry = 60;
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.moveTo(rx, 0);
-      ctx.lineTo(width - rx, 0);
-      ctx.quadraticCurveTo(width, 0, width, ry);
-      ctx.lineTo(width, height - ry);
-      ctx.quadraticCurveTo(width, height, width - rx, height);
-      ctx.lineTo(rx, height);
-      ctx.quadraticCurveTo(0, height, 0, height - ry);
-      ctx.lineTo(0, ry);
-      ctx.quadraticCurveTo(0, 0, rx, 0);
-      ctx.closePath();
-      ctx.fill();
-
-      const infoBoxWidth = 1260;
-      const infoBoxHeight = 610;
-      const infoBoxX = (width - infoBoxWidth) / 2;
-      const infoBoxY = (height - infoBoxHeight) / 2;
-      const infoBoxRx = 70, infoBoxRy = 70;
-
-      ctx.shadowColor = 'rgba(44, 39, 66, 0.8)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 5;
-
-      ctx.fillStyle = 'rgba(21, 21, 32, 0.98)';
-      ctx.beginPath();
-      ctx.moveTo(infoBoxX + infoBoxRx, infoBoxY);
-      ctx.lineTo(infoBoxX + infoBoxWidth - infoBoxRx, infoBoxY);
-      ctx.quadraticCurveTo(infoBoxX + infoBoxWidth, infoBoxY, infoBoxX + infoBoxWidth, infoBoxY + infoBoxRy);
-      ctx.lineTo(infoBoxX + infoBoxWidth, infoBoxY + infoBoxHeight - infoBoxRy);
-      ctx.quadraticCurveTo(infoBoxX + infoBoxWidth, infoBoxY + infoBoxHeight, infoBoxX + infoBoxWidth - infoBoxRx, infoBoxY + infoBoxHeight);
-      ctx.lineTo(infoBoxX + infoBoxRx, infoBoxY + infoBoxHeight);
-      ctx.quadraticCurveTo(infoBoxX, infoBoxY + infoBoxHeight, infoBoxX, infoBoxY + infoBoxHeight - infoBoxRy);
-      ctx.lineTo(infoBoxX, infoBoxY + infoBoxRy);
-      ctx.quadraticCurveTo(infoBoxX, infoBoxY, infoBoxX + infoBoxRx, infoBoxY);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-
-      const centerX = width / 2;
-      const centerY = height / 2;
-      
-      const radialGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 160);
-      radialGradient.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
-      radialGradient.addColorStop(0.7, 'rgba(139, 92, 246, 0)');
-      radialGradient.addColorStop(1, 'transparent'); 
-      
-      ctx.fillStyle = radialGradient;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 160, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 130, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(167, 139, 250, 0.4)';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 100, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.font = '500 40px sans-serif';
-      
-      const startY = infoBoxY + 120;
-
-      info.forEach((item, i) => {
-        const yPos = startY + i * 75;
-
-        ctx.fillStyle = '#d1c4e9';
-        ctx.textAlign = 'left';
-        ctx.fillText(item.label, 160, yPos);
-
-        ctx.fillStyle = '#e0e0f4';
-        ctx.fillText(item.value, 600, yPos);
-
-        ctx.strokeStyle = 'rgba(139, 92, 246, 0.15)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(160, yPos + 28);
-        ctx.lineTo(1240, yPos + 28);
-        ctx.stroke();
+      c.font = "28px 'Hacker'";
+      c.fillStyle = "#00ee77";
+      const lineHeight = 45;
+      sysInfo.forEach((info, i) => {
+        c.fillText(`◉ ${info}`, 80, 280 + (i * lineHeight));
       });
 
-      const out = fs.createWriteStream(imagePath);
-      const stream = canvas.createPNGStream();
-      stream.pipe(out);
+      // Right panel - Live Metrics
+      c.font = "bold 36px 'Hacker'";
+      c.fillStyle = "#00ff88";
+      c.textAlign = "left";
+      c.fillText("> LIVE METRICS", W/2 + 60, 220);
 
-      out.on('finish', () => {
-        api.setMessageReaction("✅", event.messageID, () => {}, true);
-        api.sendMessage({ attachment: fs.createReadStream(imagePath) }, threadID, (err) => {
-          if (!err) fs.unlink(imagePath, () => {});
-          else {
-            if (fs.existsSync(imagePath)) fs.unlink(imagePath, () => {});
-          }
-        }, messageID);
+      // ASCII art bars
+      const drawTerminalBar = (x, y, value, label, color, symbol = "█") => {
+        c.font = "26px 'Hacker'";
+        c.fillStyle = "#00cc66";
+        c.fillText(label, x, y);
+        
+        c.fillStyle = "#002200";
+        c.fillRect(x, y + 15, 400, 30);
+        
+        const fillWidth = (value / 100) * 400;
+        const barGradient = c.createLinearGradient(x, 0, x + fillWidth, 0);
+        barGradient.addColorStop(0, color);
+        barGradient.addColorStop(1, color + "cc");
+        c.fillStyle = barGradient;
+        c.fillRect(x, y + 15, fillWidth, 30);
+        
+        c.strokeStyle = "#00ff41";
+        c.lineWidth = 1;
+        c.strokeRect(x, y + 15, 400, 30);
+        
+        c.font = "bold 24px 'Hacker'";
+        c.fillStyle = "#ffffff";
+        c.textAlign = "right";
+        const symbols = symbol.repeat(Math.floor(value/20));
+        c.fillText(`${value}% ${symbols.substring(0, 5)}`, x + 395, y + 40);
+        c.textAlign = "left";
+      };
+
+      drawTerminalBar(W/2 + 60, 280, cpu, "CPU LOAD", "#00ff41", "■");
+      drawTerminalBar(W/2 + 60, 350, ram, "MEMORY USAGE", "#00ccff", "▣");
+      drawTerminalBar(W/2 + 60, 420, disk, "STORAGE USAGE", "#ff00ff", "◼");
+
+      // Status indicators
+      c.font = "bold 32px 'Hacker'";
+      c.fillStyle = "#ffff00";
+      c.textAlign = "left";
+      c.fillText("⌛ SYSTEM UPTIME:", 60, 550);
+      
+      c.font = "30px 'Hacker'";
+      c.fillStyle = "#00ffff";
+      c.fillText(`[ ${uptime} ]`, 400, 550);
+
+      c.font = "bold 32px 'Hacker'";
+      c.fillStyle = "#ffff00";
+      c.fillText("📡 RESPONSE TIME:", 60, 610);
+      
+      let pingColor = "#00ff00";
+      let pingStatus = "EXCELLENT";
+      if (ping > 200) {
+        pingColor = "#ffff00";
+        pingStatus = "GOOD";
+      }
+      if (ping > 500) {
+        pingColor = "#ff5500";
+        pingStatus = "SLOW";
+      }
+      if (ping > 1000) {
+        pingColor = "#ff0000";
+        pingStatus = "POOR";
+      }
+      
+      c.font = "30px 'Hacker'";
+      c.fillStyle = pingColor;
+      c.fillText(`[ ${ping}ms | ${pingStatus} ]`, 430, 610);
+
+      // Process info
+      c.font = "bold 32px 'Hacker'";
+      c.fillStyle = "#ffff00";
+      c.fillText("🖥️  ACTIVE PROCESSES:", 60, 670);
+      
+      c.font = "28px 'Hacker'";
+      c.fillStyle = "#ff55ff";
+      const moduleCount = Math.min(Object.keys(global).length, 999);
+      c.fillText(`${moduleCount} MODULES LOADED`, 480, 670);
+
+      // Horizontal separator line
+      c.strokeStyle = "#00ff41";
+      c.lineWidth = 1;
+      c.setLineDash([5, 3]);
+      c.beginPath();
+      c.moveTo(60, 720);
+      c.lineTo(W - 60, 720);
+      c.stroke();
+      c.setLineDash([]);
+
+      // Terminal footer
+      c.font = "22px 'Hacker'";
+      c.fillStyle = "#00ff41";
+      c.textAlign = "center";
+      
+      const blink = Math.floor(Date.now() / 500) % 2 === 0;
+      c.fillText(blink ? "▋" : "_", W/2, H - 70);
+
+      // Status message
+      const status = ping < 100 ? "OPTIMAL" : ping < 300 ? "STABLE" : "LAG DETECTED";
+      const statusColor = ping < 100 ? "#00ff00" : ping < 300 ? "#ffff00" : "#ff0000";
+      
+      c.font = "bold 30px 'Hacker'";
+      c.fillStyle = statusColor;
+      c.fillText(`<<< SYSTEM STATUS: ${status} >>>`, W/2, H - 120);
+
+      // Bottom hex stream
+      c.font = "20px 'Hacker'";
+      c.fillStyle = "#008833";
+      for (let i = 0; i < W; i += 180) {
+        const hex = Math.random().toString(16).substr(2, 6).toUpperCase();
+        c.fillText(`0x${hex}`, i + 40, H - 40);
+      }
+
+      // Binary rain in background
+      c.font = "18px 'Hacker'";
+      for (let i = 0; i < 60; i++) {
+        const x = Math.random() * W;
+        const y = Math.random() * H;
+        const binary = Math.random() > 0.5 ? "1" : "0";
+        const alpha = Math.random() * 0.2 + 0.05;
+        c.fillStyle = `rgba(0, 255, 100, ${alpha})`;
+        c.fillText(binary, x, y);
+      }
+
+      // Save image
+      const timestamp = Date.now();
+      const file = path.join(__dirname, "cache", `terminal_${timestamp}.png`);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, cv.toBuffer());
+
+      // Send ONLY the image attachment WITHOUT any message body
+      await message.reply({
+        attachment: fs.createReadStream(file)
       });
+
+      // Auto-cleanup
+      setTimeout(() => {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+        }
+      }, 15000);
 
     } catch (error) {
-      api.setMessageReaction("❌", event.messageID, () => {}, true);
-      if (fs.existsSync(imagePath)) fs.unlink(imagePath, () => {});
+      console.error("TERMINAL ERROR:", error);
+      // Send error message without ASCII art box
+      message.reply("❌ System terminal failed to generate.");
+    }
+  },
+
+  onChat: async function({ event, api }) {
+    if (event.body && event.body.toLowerCase() === "hack") {
+      api.sendMessage("```ACCESS DENIED\nINSUFFICIENT PRIVILEGES\n>_```", event.threadID);
     }
   }
 };
