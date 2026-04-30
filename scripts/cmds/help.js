@@ -2,103 +2,91 @@ const fs = require("fs-extra");
 const path = require("path");
 
 module.exports = {
-	config: {
-		name: "help",
-		aliases: ["menu", "commands"],
-		version: "4.8",
-		author: "NeoKEX",
-		shortDescription: "Show all available commands",
-		longDescription: "Displays a clean and premium-styled categorized list of commands.",
-		category: "system",
-		guide: "{pn}help [command name]"
-	},
+  config: {
+    name: "help",
+    aliases: ["menu", "commands"],
+    version: "5.0",
+    author: "ASHIK",
+    shortDescription: "Show all commands",
+    longDescription: "Displays all available commands with categories and detailed command info.",
+    category: "system",
+    guide: "{pn}help | {pn}help <command>"
+  },
 
-	onStart: async function ({ message, args, prefix }) {
-		const allCommands = global.GoatBot.commands;
-		const categories = {};
+  onStart: async function ({ message, args, prefix }) {
+    const commands = [...global.GoatBot.commands.values()];
 
-		const emojiMap = {
-			ai: "➥", "ai-image": "➥", group: "➥", system: "➥",
-			fun: "➥", owner: "➥", config: "➥", economy: "➥",
-			media: "➥", "18+": "➥", tools: "➥", utility: "➥",
-			info: "➥", image: "➥", game: "➥", admin: "➥",
-			rank: "➥", boxchat: "➥", others: "➥"
-		};
+    /* ================= COMMAND INFO ================= */
+    if (args[0]) {
+      const query = args[0].toLowerCase();
 
-		const cleanCategoryName = (text) => {
-			if (!text) return "others";
-			return text
-				.normalize("NFKD")
-				.replace(/[^\w\s-]/g, "")
-				.replace(/\s+/g, " ")
-				.trim()
-				.toLowerCase();
-		};
+      const cmd = commands.find(c =>
+        c.config.name === query ||
+        (c.config.aliases || []).includes(query)
+      );
 
-		for (const [name, cmd] of allCommands) {
-			const cat = cleanCategoryName(cmd.config.category);
-			if (!categories[cat]) categories[cat] = [];
-			categories[cat].push(cmd.config.name);
-		}
+      if (!cmd) {
+        return message.reply(`❌ Command "${query}" not found.`);
+      }
 
+      const cfg = cmd.config;
 
-		if (args[0]) {
-			const query = args[0].toLowerCase();
-			const cmd =
-				allCommands.get(query) ||
-				[...allCommands.values()].find((c) => (c.config.aliases || []).includes(query));
-			if (!cmd) return message.reply(`❌ Command "${query}" not found.`);
+      return message.reply(
+        `╔═══════════════ ⌈ 🔎 COMMAND INFO 🔎 ⌋ ═══════════════╗\n` +
+        `║ 🏷️ Name        : ${cfg.name}\n` +
+        `║ 🧩 Category    : ${cfg.category || "Uncategorized"}\n` +
+        `║ 📝 Description : ${cfg.longDescription || cfg.shortDescription || "No description"}\n` +
+        `║ 🔀 Aliases     : ${(cfg.aliases && cfg.aliases.length) ? cfg.aliases.join(", ") : "None"}\n` +
+        `║ 🧪 Version     : ${cfg.version || "1.0.0"}\n` +
+        `║ 🔐 Permission  : ${cfg.role ?? 0}\n` +
+        `║ 👨‍💻 Author      : Ashik\n` +
+        `║ 📌 Usage       : ${cfg.guide ? cfg.guide.replace(/{pn}/g, prefix) : `${prefix}${cfg.name}`}\n` +
+        `╚══════════════════════════════════════════════════════╝`
+      );
+    }
 
-			const {
-				name,
-				version,
-				author,
-				guide,
-				category,
-				shortDescription,
-				longDescription,
-				aliases,
-				role 
-			} = cmd.config;
+    /* ================= HELP MENU ================= */
+    let msg =
+      `╔════════════════════════════════════════════╗\n` +
+      `║        🤖✨ 𝗔𝗦𝗛𝗜𝗞 𝗕𝗢𝗧 - 𝗛𝗘𝗟𝗣 ✨🤖        ║\n` +
+      `╚════════════════════════════════════════════╝\n\n`;
 
-			const desc =
-				typeof longDescription === "string"
-					? longDescription
-					: longDescription?.en || shortDescription?.en || shortDescription || "No description";
+    /* ===== GROUP COMMANDS BY CATEGORY ===== */
+    const categories = {};
 
-			const usage =
-				typeof guide === "string"
-					? guide.replace(/{pn}/g, prefix)
-					: guide?.en?.replace(/{pn}/g, prefix) || `${prefix}${name}`;
+    for (const cmd of commands) {
+      const cat = cmd.config.category || "Uncategorized";
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(cmd.config.name);
+    }
 
-						const requiredRole = cmd.config.role !== undefined ? cmd.config.role : 0; 
+    for (const cat in categories) {
+      msg += `⧉───────[ 📂 ${cat.toUpperCase()} ]───────⧉\n`;
+      msg += `│ ❖ ${categories[cat].join(" ✦ ")}\n`;
+      msg += `⧉────────────────────────────────⧉\n\n`;
+    }
 
-			return message.reply(
-				`☠️ 𝗖𝗢𝗠𝗠𝗔𝗡𝗗 𝗜𝗡𝗙𝗢 ☠️\n\n` +
-				`➥ Name: ${name}\n` +
-				`➥ Category: ${category || "Uncategorized"}\n` +
-				`➥ Description: ${desc}\n` +
-				`➥ Aliases: ${aliases?.length ? aliases.join(", ") : "None"}\n` +
-				`➥ Usage: ${usage}\n` +
-				`➥ Permission: ${requiredRole}\n` + 
-				`➥ Author: ${author}\n` +
-				`➥ Version: ${version}`
-			);
-		}
+    msg +=
+      `╔════════════════════════════════════════════╗\n` +
+      `║ 🔎 ${prefix}help <command> → Command Info  ║\n` +
+      `║ 📞 ${prefix}callad → Contact Admin         ║\n` +
+      `╚════════════════════════════════════════════╝\n\n`;
 
-		const formatCommands = (cmds) =>
-			cmds.sort().map((cmd) => `× ${cmd}`);
+    /* ===== OWNER INFO ===== */
+    msg += `👑 OWNER : ✦ ASHIK ✦\n`;
+    msg += `🔗 FACEBOOK : 🌐 https://www.facebook.com/profile.php?id=61578644536780\n`;
+    msg += `🧾 TOTAL COMMANDS : 📜 ${commands.length}\n`;
 
-		let msg = `━━━☠️ 𝗡𝗲𝗼𝗞𝗘𝗫 𝗔𝗜 ☠️━━━\n`;
-		const sortedCategories = Object.keys(categories).sort();
-		for (const cat of sortedCategories) {
-			const emoji = emojiMap[cat] || "➥";
-			msg += `\n╭──『 ${cat.toUpperCase()} 』\n`; 
-			msg += `${formatCommands(categories[cat]).join(' ')}\n`; 
-			msg += `╰────────────◊\n`;
-		}
-		msg += `\n➥ Use: ${prefix}help [command name] for details\n➥Use: ${prefix}callad to talk with bot admins '_'`;
+    /* ================= IMAGE ATTACHMENT ================= */
+    const imagePath = path.join(__dirname, "helppic", "banner.png");
 
-		return message.reply(msg);
-	}
+    if (fs.existsSync(imagePath)) {
+      return message.reply({
+        body: msg,
+        attachment: fs.createReadStream(imagePath)
+      });
+    } else {
+      return message.reply(msg);
+    }
+  }
 };
