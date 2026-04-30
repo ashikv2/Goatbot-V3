@@ -1,100 +1,195 @@
-const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+
+const supportedDomains = [
+  { domain: 'facebook.com', cookieFile: null },
+  { domain: 'instagram.com', cookieFile: 'insta.txt' },
+  { domain: 'youtube.com', cookieFile: 'yt.txt' },
+  { domain: 'youtu.be', cookieFile: 'yt.txt' },
+  { domain: 'pinterest.com', cookieFile: null },
+  { domain: "tiktok.com", cookieFile: null },
+];
+
+function getMainDomain(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    if (hostname === 'youtu.be') {
+      return 'youtube.com';
+    }
+    const parts = hostname.split('.');
+    if (parts.length > 2) {
+      return parts.slice(-2).join('.');
+    }
+    return hostname;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getDefaultCookie(domain) {
+  const domainEntry = supportedDomains.find(entry => entry.domain === domain);
+  return domainEntry ? domainEntry.cookieFile : null;
+}
+
+function parseArgs(args) {
+  const params = {};
+  args.forEach((arg, i) => {
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2).toLowerCase();
+      const value = args[i + 1];
+      switch (key) {
+        case 'maxsize':
+        case 'ms':
+        case 'fs':
+          if (!isNaN(Number(value))) params.filesize = Number(value);
+          break;
+        case 'type':
+        case 'format':
+        case 'media':
+        case 'f':
+          if (['video', 'audio'].includes(value.toLowerCase())) {
+            params.format = value.toLowerCase();
+          }
+          break;
+        case 'cookie':
+        case 'cookies':
+        case 'c':
+          const cookiePath = path.join(process.cwd(), value);
+          if (fs.existsSync(cookiePath)) {
+            params.cookies = fs.readFileSync(cookiePath, 'utf-8');
+          }
+          break;
+        default:
+          break;
+      }
+    }
+  });
+  return params;
+}
+
+async function download({ url, params, message, event }) {
+  try {
+    const domain = getMainDomain(url);
+    
+    if (!params.cookies) {
+      const defaultCookieFile = getDefaultCookie(domain);
+      if (defaultCookieFile) {
+        const cookiePath = path.join(process.cwd(), defaultCookieFile);
+        if (fs.existsSync(cookiePath)) {
+          params.cookies = fs.readFileSync(cookiePath, 'utf-8');
+        }
+      }
+    }
+    
+    if (!params.filesize) {
+      params.filesize = 25;
+    }
+    
+    const requestBody = {
+      url,
+      ...(params.format && { format: params.format }),
+      ...(params.filesize && { filesize: params.filesize }),
+      ...(params.cookies && { cookies: params.cookies }),
+    };
+    
+    const apiUrl = (await axios.get('https://raw.githubusercontent.com/Tanvir0999/stuffs/refs/heads/main/raw/addresses.json')).data.megadl;
+    const response = await axios.post(apiUrl, requestBody);
+    const data = response.data;
+    
+    await message.reply({
+      body: `• ${data.title.length > 50 ? data.title.slice(0, 50) + "..." : data.title}\n• Duration: ${data.duration}\n• Upload Date: ${data.upload_date || '--'}\n• Source: ${data.source}\n\n• Stream: ${data.url}`,
+      attachment: await global.utils.getStreamFromUrl(data.url),
+    });
+    
+    message.reaction('✅', event.messageID);
+  } catch (error) {
+    message.reaction('❌', event.messageID);
+    return { repay: 50 };
+  }
+}
 
 module.exports = {
   config: {
-    name: "alldl",
-    aliases: ["fbdl", "igdl", "ttdl", "ytdl", "dl"],
-    version: "2.1",
-    author: "Neoaz 🐊",
+    name: 'download',
+    aliases: ['downloader', 'megadl', 'fb', 'fbdl', 'facebook', 'insta', 'instadl', 'instagram', 'yt', 'ytdl'],
+    version: '2.3',
+    author: 'tanvir',
     countDown: 5,
     role: 0,
-    shortDescription: { en: "Multi-platform video downloader" },
-    longDescription: { en: "Download videos from FB, IG, TikTok, YT via link or auto-detection." },
-    category: "media",
-    guide: { en: "{pn} <url> or reply to a link. Use '{pn} auto' to toggle auto-download." }
+    longDescription: 'Download videos or audios from supported platforms. Supports parameters for file size, format, and cookies.',
+    category: 'media',
+    guide: {
+      en: {
+        body: `{pn} [URL] [optional parameters]\n\n
+  # Examples:
+     • {pn} https://facebook.com/video --fs 100 --type audio --c cookies.txt\n
+     • {pn} https://youtube.com/watch?v=abc --maxsize 200 --format video\n
+     • {pn} https://instagram.com/p/xyz\n\n
+  # Parameters:
+     • URL: The video or audio URL from a supported platform.\n
+     • --fs or --maxsize: Maximum file size in MB (default: 25).\n
+     • --type or --format: Download type ('video' or 'audio', optional).\n
+     • --c or --cookie: Path to a cookie file (defaults based on platform).`,
+      },
+    },
   },
-
-  onStart: async function ({ message, args, event, api }) {
-    const input = args[0];
-
-    if (input === "auto") {
-      if (!global.alldl_auto) global.alldl_auto = {};
-      const threadID = event.threadID;
-      global.alldl_auto[threadID] = global.alldl_auto[threadID] === false ? true : false;
-      return message.reply(`Auto-download is now ${global.alldl_auto[threadID] ? "ON" : "OFF"}.`);
-    }
-
-    let url = input;
-    const { type, messageReply } = event;
-
-    if (type === "message_reply") {
-      const replyText = messageReply.body;
-      const urlMatch = replyText.match(/https?:\/\/[^\s]+/);
-      if (urlMatch) url = urlMatch[0];
-    }
-
-    if (!url || !url.startsWith("http")) {
-      return message.reply("Please provide a valid link or reply to one.");
-    }
-
-    return this.handleDownload({ message, event, api, url });
-  },
-
-  onChat: async function ({ message, event, api }) {
-    const threadID = event.threadID;
-    if (!global.alldl_auto) global.alldl_auto = {};
-    
-    if (global.alldl_auto[threadID] === false) return;
-    if (!event.body || typeof event.body !== 'string') return;
-
-    const urlMatch = event.body.match(/https?:\/\/(www\.)?(facebook|fb|instagram|tiktok|youtube|youtu|shorts)\.[^\s]+/);
-    if (urlMatch && !event.body.startsWith(global.GoatBot.config.prefix)) {
-      return this.handleDownload({ message, event, api, url: urlMatch[0] });
-    }
-  },
-
-  handleDownload: async function ({ message, event, api, url }) {
-    api.setMessageReaction("⏳", event.messageID);
-    const cacheDir = path.join(__dirname, "cache");
-    await fs.ensureDir(cacheDir);
-    const filePath = path.join(cacheDir, `dl_${Date.now()}.mp4`);
-
-    try {
-      const res = await axios.get(`https://neoaz.is-a.dev/api/download?url=${encodeURIComponent(url)}`);
-      const videoUrl = res.data.video?.directUrl || res.data.video?.downloadUrl;
-      const title = res.data.info?.title || "Downloaded Video";
-
-      if (!videoUrl) throw new Error("Could not find direct stream URL.");
-
-      const response = await axios({
-        method: 'get',
-        url: videoUrl,
-        responseType: 'stream'
-      });
-
-      const writer = fs.createWriteStream(filePath);
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      await message.reply({
-        body: title,
-        attachment: fs.createReadStream(filePath)
-      });
-
-      api.setMessageReaction("✅", event.messageID);
-    } catch (error) {
-      console.error(error);
-      api.setMessageReaction("❌", event.messageID);
-    } finally {
-      if (fs.existsSync(filePath)) {
-        setTimeout(() => fs.unlinkSync(filePath), 10000);
+  
+  onStart: async function({ message, args, event, threadsData, role }) {
+    if (args[0] === 'chat' && (args[1] === 'on' || args[1] === 'off') || args[0] === 'on' || args[0] === 'off') {
+      if (role < 1) {
+        return message.reply('You do not have permission to change auto-download settings.');
       }
+      const choice = args[0] === 'on' || args[1] === 'on';
+      const gcData = await threadsData.get(event.threadID, "data");
+      await threadsData.set(event.threadID, { data: { ...gcData, autoDownload: choice } });
+      return message.reply(`Auto-download has been turned ${choice ? 'on' : 'off'} for this group.`);
     }
-  }
+    
+    const url = args.find(arg => /^https?:\/\//.test(arg));
+    if (!url) {
+      return message.reply('Please provide a valid URL to download.');
+    }
+    
+    const domain = getMainDomain(url);
+    const isSupported = supportedDomains.some(entry => entry.domain === domain);
+    if (!isSupported) {
+      return message.reply('This platform is not enabled/supported. Please ask Admin to request support of this platform.');
+    }
+    
+    const paramArgs = args.filter(arg => arg !== url);
+    const params = parseArgs(paramArgs);
+    
+    message.reaction('⏳', event.messageID);
+    await download({ url, params, message, event });
+  },
+  
+  onChat: async function({ event, message, threadsData }) {
+    const threadData = await threadsData.get(event.threadID);
+    if (!threadData.data.autoDownload || threadData.data.autoDownload === false || event.senderID === global.botID) {
+      return;
+    }
+    
+    try {
+      const urlRegex = /https:\/\/[^\s]+/;
+      const match = event.body.match(urlRegex);
+      if (match) {
+        const url = match[0];
+        const domain = getMainDomain(url);
+        
+        const isSupported = supportedDomains.some(entry => entry.domain === domain);
+        if (isSupported) {
+          const prefix = await global.utils.getPrefix(event.threadID);
+          if (event.body.startsWith(prefix)) return;
+          
+          message.reaction('⏳', event.messageID);
+          const params = {};
+          await download({ url, params, message, event });
+        }
+      }
+    } catch (error) {
+      message.reaction('', event.messageID);
+      console.error('onChat Error:', error);
+    }
+  },
 };

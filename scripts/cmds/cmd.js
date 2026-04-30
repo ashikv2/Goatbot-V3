@@ -50,48 +50,48 @@ module.exports = {
 
 	langs: {
 		vi: {
-			missingFileName: "⚠ | Vui lòng nhập vào tên lệnh bạn muốn reload",
-			loaded: "✓ | Đã load command \"%1\" thành công",
-			loadedError: "✗ | Load command \"%1\" thất bại với lỗi\n%2: %3",
-			loadedSuccess: "✓ | Đã load thành công (%1) command",
-			loadedFail: "✗ | Load thất bại (%1) command\n%2",
+			missingFileName: "⚠️ | Vui lòng nhập vào tên lệnh bạn muốn reload",
+			loaded: "✅ | Đã load command \"%1\" thành công",
+			loadedError: "❌ | Load command \"%1\" thất bại với lỗi\n%2: %3",
+			loadedSuccess: "✅ | Đã load thành công (%1) command",
+			loadedFail: "❌ | Load thất bại (%1) command\n%2",
 			openConsoleToSeeError: "👀 | Hãy mở console để xem chi tiết lỗi",
-			missingCommandNameUnload: "⚠ | Vui lòng nhập vào tên lệnh bạn muốn unload",
-			unloaded: "✓ | Đã unload command \"%1\" thành công",
-			unloadedError: "✗ | Unload command \"%1\" thất bại với lỗi\n%2: %3",
-			missingUrlCodeOrFileName: "⚠ | Vui lòng nhập vào url hoặc code và tên file lệnh bạn muốn cài đặt",
-			missingUrlOrCode: "⚠ | Vui lòng nhập vào url hoặc code của tệp lệnh bạn muốn cài đặt",
-			missingFileNameInstall: "⚠ | Vui lòng nhập vào tên file để lưu lệnh (đuôi .js)",
-			invalidUrl: "⚠ | Vui lòng nhập vào url hợp lệ",
-			invalidUrlOrCode: "⚠ | Không thể lấy được mã lệnh",
-			alreadExist: "⚠ | File lệnh đã tồn tại, bạn có chắc chắn muốn ghi đè lên file lệnh cũ không?\nThả cảm xúc bất kì vào tin nhắn này để tiếp tục",
-			installed: "✓ | Đã cài đặt command \"%1\" thành công, file lệnh được lưu tại %2",
-			installedError: "✗ | Cài đặt command \"%1\" thất bại với lỗi\n%2: %3",
-			missingFile: "⚠ | Không tìm thấy tệp lệnh \"%1\"",
-			invalidFileName: "⚠ | Tên tệp lệnh không hợp lệ",
-			unloadedFile: "✓ | Đã unload lệnh \"%1\""
+			missingCommandNameUnload: "⚠️ | Vui lòng nhập vào tên lệnh bạn muốn unload",
+			unloaded: "✅ | Đã unload command \"%1\" thành công",
+			unloadedError: "❌ | Unload command \"%1\" thất bại với lỗi\n%2: %3",
+			missingUrlCodeOrFileName: "⚠️ | Vui lòng nhập vào url hoặc code và tên file lệnh bạn muốn cài đặt",
+			missingUrlOrCode: "⚠️ | Vui lòng nhập vào url hoặc code của tệp lệnh bạn muốn cài đặt",
+			missingFileNameInstall: "⚠️ | Vui lòng nhập vào tên file để lưu lệnh (đuôi .js)",
+			invalidUrl: "⚠️ | Vui lòng nhập vào url hợp lệ",
+			invalidUrlOrCode: "⚠️ | Không thể lấy được mã lệnh",
+			alreadExist: "⚠️ | File lệnh đã tồn tại, bạn có chắc chắn muốn ghi đè lên file lệnh cũ không?\nThả cảm xúc bất kì vào tin nhắn này để tiếp tục",
+			installed: "✅ | Đã cài đặt command \"%1\" thành công, file lệnh được lưu tại %2",
+			installedError: "❌ | Cài đặt command \"%1\" thất bại với lỗi\n%2: %3",
+			missingFile: "⚠️ | Không tìm thấy tệp lệnh \"%1\"",
+			invalidFileName: "⚠️ | Tên tệp lệnh không hợp lệ",
+			unloadedFile: "✅ | Đã unload lệnh \"%1\""
 		},
 		en: {
-			missingFileName: "⚠ | Please enter the command name you want to reload",
-			loaded: "✓ | Loaded command \"%1\" successfully",
-			loadedError: "✗ | Failed to load command \"%1\" with error\n%2: %3",
-			loadedSuccess: "✓ | Loaded successfully (%1) command",
-			loadedFail: "✗ | Failed to load (%1) command\n%2",
+			missingFileName: "⚠️ | Please enter the command name you want to reload",
+			loaded: "✅ | Loaded command \"%1\" successfully",
+			loadedError: "❌ | Failed to load command \"%1\" with error\n%2: %3",
+			loadedSuccess: "✅ | Loaded successfully (%1) command",
+			loadedFail: "❌ | Failed to load (%1) command\n%2",
 			openConsoleToSeeError: "👀 | Open console to see error details",
-			missingCommandNameUnload: "⚠ | Please enter the command name you want to unload",
-			unloaded: "✓ | Unloaded command \"%1\" successfully",
-			unloadedError: "✗ | Failed to unload command \"%1\" with error\n%2: %3",
-			missingUrlCodeOrFileName: "⚠ | Please enter the url or code and command file name you want to install",
-			missingUrlOrCode: "⚠ | Please enter the url or code of the command file you want to install",
-			missingFileNameInstall: "⚠ | Please enter the file name to save the command (with .js extension)",
-			invalidUrl: "⚠ | Please enter a valid url",
-			invalidUrlOrCode: "⚠ | Unable to get command code",
-			alreadExist: "⚠ | The command file already exists, are you sure you want to overwrite the old command file?\nReact to this message to continue",
-			installed: "✓ | Installed command \"%1\" successfully, the command file is saved at %2",
-			installedError: "✗ | Failed to install command \"%1\" with error\n%2: %3",
-			missingFile: "⚠ | Command file \"%1\" not found",
-			invalidFileName: "⚠ | Invalid command file name",
-			unloadedFile: "✓ | Unloaded command \"%1\""
+			missingCommandNameUnload: "⚠️ | Please enter the command name you want to unload",
+			unloaded: "✅ | Unloaded command \"%1\" successfully",
+			unloadedError: "❌ | Failed to unload command \"%1\" with error\n%2: %3",
+			missingUrlCodeOrFileName: "⚠️ | Please enter the url or code and command file name you want to install",
+			missingUrlOrCode: "⚠️ | Please enter the url or code of the command file you want to install",
+			missingFileNameInstall: "⚠️ | Please enter the file name to save the command (with .js extension)",
+			invalidUrl: "⚠️ | Please enter a valid url",
+			invalidUrlOrCode: "⚠️ | Unable to get command code",
+			alreadExist: "⚠️ | The command file already exists, are you sure you want to overwrite the old command file?\nReact to this message to continue",
+			installed: "✅ | Installed command \"%1\" successfully, the command file is saved at %2",
+			installedError: "❌ | Failed to install command \"%1\" with error\n%2: %3",
+			missingFile: "⚠️ | Command file \"%1\" not found",
+			invalidFileName: "⚠️ | Invalid command file name",
+			unloadedFile: "✅ | Unloaded command \"%1\""
 		}
 	},
 
@@ -136,7 +136,7 @@ module.exports = {
 				if (infoLoad.status == "success")
 					arraySucces.push(fileName);
 				else
-					arrayFail.push(` ! ${fileName} => ${infoLoad.error.name}: ${infoLoad.error.message}`);
+					arrayFail.push(` ❗ ${fileName} => ${infoLoad.error.name}: ${infoLoad.error.message}`);
 			}
 
 			let msg = "";
